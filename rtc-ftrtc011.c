@@ -376,6 +376,10 @@ static irqreturn_t ftrtc011_pi_handler(int irq, void *dev_id,
 
 	spin_unlock(&ftrtc011->lock);
 
+	/*
+	 * Even we clear the per second interrupt bit, it still comes.
+	 * Maybe a HW bug?
+	 */
 	outl(FTRTC011_INTR_STATE_SEC, ftrtc011->base + FTRTC011_OFFSET_INTR_STATE);
 	return IRQ_HANDLED;
 }
