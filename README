@@ -1,0 +1,52 @@
+*put the following code in your platform-dpendent initialization sequence.
+------------------------>8-------------------------->8------------------------
+static struct resource ftrtc011_resources[] = {
+	{
+		.start	= RTC_FTRTC011_0_PA_BASE,
+		.end	= RTC_FTRTC011_0_PA_BASE + RTC_FTRTC011_0_PA_SIZE,
+		.flags	= IORESOURCE_MEM,
+	}, {	/* alarm interrupt */
+		.start	= RTC_FTRTC011_0_IRQ0,
+		.end	= RTC_FTRTC011_0_IRQ0,
+		.flags	= IORESOURCE_IRQ,
+	}, {	/* periodic interrupt */
+		.start	= RTC_FTRTC011_0_IRQ1,
+		.end	= RTC_FTRTC011_0_IRQ1,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static struct platform_device ftrtc011_device = {
+	.name		= "ftrtc011",
+	.id		= 0,
+	.num_resources	= ARRAY_SIZE(ftrtc011_resources),
+	.resource	= ftrtc011_resources,
+};
+
+platform_device_register(&ftrtc011_device);
+------------------------>8-------------------------->8------------------------
+
+* make sure the following config options are set
+CONFIG_RTC_INTF_SYSFS=y (do not set this if using linux-2.6.18, it seems buggy)
+CONFIG_RTC_LIB=y
+CONFIG_RTC_CLASS=y
+CONFIG_RTC_INTF_PROC=y
+CONFIG_RTC_INTF_DEV=y
+
+* if you build this driver into kernel, then kernel will create /dev/rtc0 for you.
+* if not,
+  * you need udev to create /dev/rtc0 automatically for you, or
+  * create /dev/rtc0 manually:
+
+1) insert module
+# insmod rtc-ftrtc011.ko
+
+2) find out the dynamically create major/minor number of rtc0
+# cat /sys/devices/platform/ftrtc011.0/rtc\:rtc0/dev
+254:0
+
+3) create device file
+# mknod /dev/rtc0 c 254 0
+
+* after you have a correct device file, you can run the test program.
+
