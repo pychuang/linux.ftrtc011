@@ -1,19 +1,19 @@
 *put the following code in your platform-dpendent initialization sequence.
 ------------------------>8-------------------------->8------------------------
 static struct resource ftrtc011_resources[] = {
-	{
-		.start	= RTC_FTRTC011_0_PA_BASE,
-		.end	= RTC_FTRTC011_0_PA_BASE + RTC_FTRTC011_0_PA_SIZE,
-		.flags	= IORESOURCE_MEM,
-	}, {	/* alarm interrupt */
-		.start	= RTC_FTRTC011_0_IRQ0,
-		.end	= RTC_FTRTC011_0_IRQ0,
-		.flags	= IORESOURCE_IRQ,
-	}, {	/* periodic interrupt */
-		.start	= RTC_FTRTC011_0_IRQ1,
-		.end	= RTC_FTRTC011_0_IRQ1,
-		.flags	= IORESOURCE_IRQ,
-	},
+        {
+                .start  = A369_FTRTC011_0_PA_BASE,
+                .end    = A369_FTRTC011_0_PA_BASE + SZ_8K -1,
+                .flags  = IORESOURCE_MEM,
+        }, {    /* alarm interrupt */
+                .start  = IRQ_A369_FTRTC011_0_ALRM,
+                .end    = IRQ_A369_FTRTC011_0_ALRM,
+                .flags  = IORESOURCE_IRQ,
+        }, {    /* periodic interrupt */
+                .start  = IRQ_A369_FTRTC011_0_SEC,
+                .end    = IRQ_A369_FTRTC011_0_SEC,
+                .flags  = IORESOURCE_IRQ,
+        },
 };
 
 static struct platform_device ftrtc011_device = {

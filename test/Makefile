@@ -1,5 +1,5 @@
 CFLAGS= -static
-CC=arm-linux-gcc
+CC=arm-none-linux-gnueabi-gcc
 
 rtctst: rtctst.c
 	$(CC) $(CFLAGS) $< -o $@

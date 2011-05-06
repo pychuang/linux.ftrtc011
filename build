@@ -6,4 +6,4 @@ else
     target=$1
 fi
 #make -C /home/ratbert/linux/FA5A320LINUX2618_Kernel M=`pwd` $target
-make -C /home/ratbert/linux/FA5A320LINUX26_Kernel M=`pwd` $target
+make -C /home/linux-2.6.35 M=`pwd` $target

@@ -27,6 +27,7 @@
 #include <linux/platform_device.h>
 #include <linux/module.h>
 #include <linux/rtc.h>
+#include <linux/slab.h>
 #include <asm/io.h>
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27))
@@ -136,33 +137,33 @@ static unsigned long ftrtc011_raw_time_to_user_time(struct ftrtc011 *ftrtc011,
 static void ftrtc011_user_tm_to_raw_tm(struct ftrtc011 *ftrtc011,
 	struct rtc_time *user_tm, struct rtc_time *raw_tm)
 {
-	raw_tm->tm_sec		= user_tm->tm_sec;
-	raw_tm->tm_min		= user_tm->tm_min;
-	raw_tm->tm_hour		= user_tm->tm_hour;
-	raw_tm->tm_mday		= user_tm->tm_mday;
-	raw_tm->tm_mon		= user_tm->tm_mon;
-	raw_tm->tm_year		= user_tm->tm_year;
-	raw_tm->tm_wday		= user_tm->tm_wday;
-	raw_tm->tm_yday		= user_tm->tm_yday;
-	raw_tm->tm_isdst	= user_tm->tm_isdst;
+	raw_tm->tm_sec = user_tm->tm_sec;
+	raw_tm->tm_min	= user_tm->tm_min;
+	raw_tm->tm_hour	= user_tm->tm_hour;
+	raw_tm->tm_mday	= user_tm->tm_mday;
+	raw_tm->tm_mon	= user_tm->tm_mon;
+	raw_tm->tm_year	= user_tm->tm_year;
+	raw_tm->tm_wday	= user_tm->tm_wday;
+	raw_tm->tm_yday	= user_tm->tm_yday;
+	raw_tm->tm_isdst = user_tm->tm_isdst;
 }
 #else	/* !CONFIG_FTRTC011_WRITABLE_TIME */
 static unsigned long ftrtc011_raw_time_to_user_time(struct ftrtc011 *ftrtc011,
 		unsigned long time)
 {
-	return time + inl(ftrtc011->base + FTRTC011_OFFSET_RECORD);
+	return time + ioread32(ftrtc011->base + FTRTC011_OFFSET_RECORD);
 }
 
 static unsigned long ftrtc011_user_time_to_raw_time(struct ftrtc011 *ftrtc011,
 		unsigned long time)
 {
-	return time - inl(ftrtc011->base + FTRTC011_OFFSET_RECORD);
+	return time - ioread32(ftrtc011->base + FTRTC011_OFFSET_RECORD);
 }
 
 static void ftrtc011_user_tm_to_raw_tm(struct ftrtc011 *ftrtc011,
 		struct rtc_time *user_tm, struct rtc_time *raw_tm)
 {
-	unsigned long	time;
+	unsigned long time;
 
 	rtc_tm_to_time(user_tm, &time);
 	time = ftrtc011_user_time_to_raw_time(ftrtc011, time);
@@ -172,14 +173,14 @@ static void ftrtc011_user_tm_to_raw_tm(struct ftrtc011 *ftrtc011,
 
 static unsigned long ftrtc011_get_raw_uptime(struct ftrtc011 *ftrtc011)
 {
-	unsigned long	sec, sec2, min, hour, day;
+	unsigned long sec, sec2, min, hour, day;
 
 	do {
-		sec	= inl(ftrtc011->base + FTRTC011_OFFSET_SEC);
-		min	= inl(ftrtc011->base + FTRTC011_OFFSET_MIN);
-		hour	= inl(ftrtc011->base + FTRTC011_OFFSET_HOUR);
-		day	= inl(ftrtc011->base + FTRTC011_OFFSET_DAY);
-		sec2	= inl(ftrtc011->base + FTRTC011_OFFSET_SEC);
+		sec = ioread32(ftrtc011->base + FTRTC011_OFFSET_SEC);
+		min = ioread32(ftrtc011->base + FTRTC011_OFFSET_MIN);
+		hour = ioread32(ftrtc011->base + FTRTC011_OFFSET_HOUR);
+		day = ioread32(ftrtc011->base + FTRTC011_OFFSET_DAY);
+		sec2 = ioread32(ftrtc011->base + FTRTC011_OFFSET_SEC);
 	} while (sec != sec2);
 
 	dev_info(&ftrtc011->pdev->dev, "raw uptime: %ld day, %ld:%ld:%ld\n",
@@ -190,7 +191,7 @@ static unsigned long ftrtc011_get_raw_uptime(struct ftrtc011 *ftrtc011)
 
 static unsigned long ftrtc011_get_uptime(struct ftrtc011 *ftrtc011)
 {
-	unsigned long	time = ftrtc011_get_raw_uptime(ftrtc011);
+	unsigned long time = ftrtc011_get_raw_uptime(ftrtc011);
 
 	return ftrtc011_raw_time_to_user_time(ftrtc011, time);
 }
@@ -198,41 +199,41 @@ static unsigned long ftrtc011_get_uptime(struct ftrtc011 *ftrtc011)
 #ifdef	CONFIG_FTRTC011_WRITABLE_TIME
 static void ftrtc011_set_uptime(struct ftrtc011 *ftrtc011, unsigned long time)
 {
-	unsigned long	sec, min, hour, day;
-	unsigned int	cr;
+	unsigned long sec, min, hour, day;
+	unsigned int cr;
 
-	sec	= time % 60;
-	min	= (time / 60) % 60;
-	hour	= (time / 60 / 60) % 24;
-	day	= time / 60 / 60 / 24;
+	sec = time % 60;
+	min = (time / 60) % 60;
+	hour = (time / 60 / 60) % 24;
+	day = time / 60 / 60 / 24;
 
-	outl(sec,  ftrtc011->base + FTRTC011_OFFSET_WSEC);
-	outl(min,  ftrtc011->base + FTRTC011_OFFSET_WMIN);
-	outl(hour, ftrtc011->base + FTRTC011_OFFSET_WHOUR);
-	outl(day,  ftrtc011->base + FTRTC011_OFFSET_WDAY);
+	iowrite32(sec,  ftrtc011->base + FTRTC011_OFFSET_WSEC);
+	iowrite32(min,  ftrtc011->base + FTRTC011_OFFSET_WMIN);
+	iowrite32(hour, ftrtc011->base + FTRTC011_OFFSET_WHOUR);
+	iowrite32(day,  ftrtc011->base + FTRTC011_OFFSET_WDAY);
 
-	cr = inl(ftrtc011->base + FTRTC011_OFFSET_CR);
+	cr = ioread32(ftrtc011->base + FTRTC011_OFFSET_CR);
 	cr |= FTRTC011_CR_COUNTER_LOAD;
-	outl(cr, ftrtc011->base + FTRTC011_OFFSET_CR);
+	iowrite32(cr, ftrtc011->base + FTRTC011_OFFSET_CR);
 }
 #else	/* !CONFIG_FTRTC011_WRITABLE_TIME */
 static void ftrtc011_set_uptime(struct ftrtc011 *ftrtc011, unsigned long time)
 {
-	unsigned long	now = ftrtc011_get_raw_uptime(ftrtc011);
+	unsigned long now = ftrtc011_get_raw_uptime(ftrtc011);
 
 	dev_info(&ftrtc011->pdev->dev, "now: %lx, new: %lx\n", now, time);
 
-	outl(time - now, ftrtc011->base + FTRTC011_OFFSET_RECORD);
+	iowrite32(time - now, ftrtc011->base + FTRTC011_OFFSET_RECORD);
 }
 #endif	/* CONFIG_FTRTC011_WRITABLE_TIME */
 
 static void ftrtc011_get_alarm_tm(struct ftrtc011 *ftrtc011, struct rtc_time *tm)
 {
-	unsigned long	sec	= inl(ftrtc011->base + FTRTC011_OFFSET_ALARM_SEC);
-	unsigned long	min	= inl(ftrtc011->base + FTRTC011_OFFSET_ALARM_MIN);
-	unsigned long	hour	= inl(ftrtc011->base + FTRTC011_OFFSET_ALARM_HOUR);
-	unsigned long	day	= inl(ftrtc011->base + FTRTC011_OFFSET_DAY);
-	unsigned long	time;
+	unsigned long time; 
+	unsigned long sec = ioread32(ftrtc011->base + FTRTC011_OFFSET_ALARM_SEC);
+	unsigned long min = ioread32(ftrtc011->base + FTRTC011_OFFSET_ALARM_MIN);
+	unsigned long hour = ioread32(ftrtc011->base + FTRTC011_OFFSET_ALARM_HOUR);
+	unsigned long day = ioread32(ftrtc011->base + FTRTC011_OFFSET_DAY);
 
 	dev_info(&ftrtc011->pdev->dev, "%s() raw day %ld, %ld:%ld:%ld\n",
 		__func__, day, hour, min, sec);
@@ -250,9 +251,9 @@ static void ftrtc011_set_raw_alarm_tm(struct ftrtc011 *ftrtc011, struct rtc_time
 {
 	ftrtc011_show_tm(ftrtc011, __func__, tm);
 
-	outl(tm->tm_sec,  ftrtc011->base + FTRTC011_OFFSET_ALARM_SEC);
-	outl(tm->tm_min,  ftrtc011->base + FTRTC011_OFFSET_ALARM_MIN);
-	outl(tm->tm_hour, ftrtc011->base + FTRTC011_OFFSET_ALARM_HOUR);
+	iowrite32(tm->tm_sec, ftrtc011->base + FTRTC011_OFFSET_ALARM_SEC);
+	iowrite32(tm->tm_min, ftrtc011->base + FTRTC011_OFFSET_ALARM_MIN);
+	iowrite32(tm->tm_hour, ftrtc011->base + FTRTC011_OFFSET_ALARM_HOUR);
 }
 
 static void ftrtc011_set_alarm_tm(struct ftrtc011 *ftrtc011, struct rtc_time *tm)
@@ -267,48 +268,49 @@ static void ftrtc011_set_alarm_tm(struct ftrtc011 *ftrtc011, struct rtc_time *tm
 
 static void ftrtc011_enable_alarm(struct ftrtc011 *ftrtc011)
 {
-	unsigned int	cr;
+	unsigned int cr;
 
 	dev_info(&ftrtc011->pdev->dev, "%s()\n", __func__);
 
-	cr = inl(ftrtc011->base + FTRTC011_OFFSET_CR);
+	cr = ioread32(ftrtc011->base + FTRTC011_OFFSET_CR);
 	cr |= FTRTC011_CR_ALARM_INTERRUPT;
-	outl(cr, ftrtc011->base + FTRTC011_OFFSET_CR);
+	iowrite32(cr, ftrtc011->base + FTRTC011_OFFSET_CR);
 }
 
 static void ftrtc011_disable_alarm(struct ftrtc011 *ftrtc011)
 {
-	unsigned int	cr;
+	unsigned int cr;
 
 	dev_info(&ftrtc011->pdev->dev, "%s()\n", __func__);
 
-	cr = inl(ftrtc011->base + FTRTC011_OFFSET_CR);
+	cr = ioread32(ftrtc011->base + FTRTC011_OFFSET_CR);
 	cr &= ~FTRTC011_CR_ALARM_INTERRUPT;
-	outl(cr, ftrtc011->base + FTRTC011_OFFSET_CR);
+	iowrite32(cr, ftrtc011->base + FTRTC011_OFFSET_CR);
 }
 
 static void ftrtc011_enable_per_second_interrupt(struct ftrtc011 *ftrtc011)
 {
-	unsigned int	cr;
+	unsigned int cr;
 
-	cr = inl(ftrtc011->base + FTRTC011_OFFSET_CR);
+	cr = ioread32(ftrtc011->base + FTRTC011_OFFSET_CR);
 	cr |= FTRTC011_CR_INTERRUPT_SEC;
-	outl(cr, ftrtc011->base + FTRTC011_OFFSET_CR);
+	iowrite32(cr, ftrtc011->base + FTRTC011_OFFSET_CR);
 }
 
 static void ftrtc011_disable_per_second_interrupt(struct ftrtc011 *ftrtc011)
 {
-	unsigned int	cr;
+	unsigned int cr;
 
-	cr = inl(ftrtc011->base + FTRTC011_OFFSET_CR);
+	cr = ioread32(ftrtc011->base + FTRTC011_OFFSET_CR);
 	cr &= ~FTRTC011_CR_INTERRUPT_SEC;
-	outl(cr, ftrtc011->base + FTRTC011_OFFSET_CR);
+	iowrite32(cr, ftrtc011->base + FTRTC011_OFFSET_CR);
 }
 
 static void ftrtc011_enable(struct ftrtc011 *ftrtc011)
 {
 	/* make sure RTC is enabled and no interrupt will be issued */
-	outl(FTRTC011_CR_ENABLE | FTRTC011_CR_REFRESH, ftrtc011->base + FTRTC011_OFFSET_CR);
+	iowrite32(FTRTC011_CR_ENABLE | FTRTC011_CR_REFRESH,
+		ftrtc011->base + FTRTC011_OFFSET_CR);
 }
 
 /******************************************************************************
@@ -321,9 +323,9 @@ static irqreturn_t ftrtc011_ai_handler(int irq, void *dev_id,
 		struct pt_regs *regs)
 #endif
 {
-	struct ftrtc011		*ftrtc011 = dev_id;
-	struct rtc_device	*rtc = ftrtc011->rtc;
-	unsigned long		events = 0;
+	struct ftrtc011	*ftrtc011 = dev_id;
+	struct rtc_device *rtc = ftrtc011->rtc;
+	unsigned long events = 0;
 
 	dev_info(&ftrtc011->pdev->dev, "%s()\n", __func__);
 
@@ -341,7 +343,8 @@ static irqreturn_t ftrtc011_ai_handler(int irq, void *dev_id,
 
 	spin_unlock(&ftrtc011->lock);
 
-	outl(FTRTC011_INTR_STATE_ALARM, ftrtc011->base + FTRTC011_OFFSET_INTR_STATE);
+	iowrite32(FTRTC011_INTR_STATE_ALARM,
+		ftrtc011->base + FTRTC011_OFFSET_INTR_STATE);
 	return IRQ_HANDLED;
 }
 
@@ -380,7 +383,7 @@ static irqreturn_t ftrtc011_pi_handler(int irq, void *dev_id,
 	 * Even we clear the per second interrupt bit, it still comes.
 	 * Maybe a HW bug?
 	 */
-	outl(FTRTC011_INTR_STATE_SEC, ftrtc011->base + FTRTC011_OFFSET_INTR_STATE);
+	iowrite32(FTRTC011_INTR_STATE_SEC, ftrtc011->base + FTRTC011_OFFSET_INTR_STATE);
 	return IRQ_HANDLED;
 }
 
@@ -389,9 +392,9 @@ static irqreturn_t ftrtc011_pi_handler(int irq, void *dev_id,
  *****************************************************************************/
 static int ftrtc011_open(struct device *dev)
 {
-	struct platform_device	*pdev = to_platform_device(dev);
-	struct ftrtc011		*ftrtc011 = platform_get_drvdata(pdev);
-	int			ret;
+	struct platform_device *pdev = to_platform_device(dev);
+	struct ftrtc011	*ftrtc011 = platform_get_drvdata(pdev);
+	int ret;
 
 	dev_info(dev, "%s()\n", __func__);
 
@@ -419,8 +422,8 @@ fail_ai:
 
 static void ftrtc011_release(struct device *dev)
 {
-	struct platform_device	*pdev = to_platform_device(dev);
-	struct ftrtc011		*ftrtc011 = platform_get_drvdata(pdev);
+	struct platform_device *pdev = to_platform_device(dev);
+	struct ftrtc011 *ftrtc011 = platform_get_drvdata(pdev);
 
 	dev_info(dev, "%s()\n", __func__);
 
@@ -437,10 +440,10 @@ static void ftrtc011_release(struct device *dev)
 static int ftrtc011_ioctl(struct device *dev, unsigned int cmd,
 		unsigned long arg)
 {
-	struct platform_device	*pdev = to_platform_device(dev);
-	struct ftrtc011		*ftrtc011 = platform_get_drvdata(pdev);
+	struct platform_device *pdev = to_platform_device(dev);
+	struct ftrtc011	*ftrtc011 = platform_get_drvdata(pdev);
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19))
-	struct rtc_device	*rtc = ftrtc011->rtc;
+	struct rtc_device *rtc = ftrtc011->rtc;
 	void __user *uarg = (void __user *) arg;
 #endif
 
@@ -478,9 +481,9 @@ static int ftrtc011_ioctl(struct device *dev, unsigned int cmd,
 
 static int ftrtc011_read_time(struct device *dev, struct rtc_time *tm)
 {
-	struct platform_device	*pdev = to_platform_device(dev);
-	struct ftrtc011		*ftrtc011 = platform_get_drvdata(pdev);
-	unsigned long		time;
+	struct platform_device *pdev = to_platform_device(dev);
+	struct ftrtc011	*ftrtc011 = platform_get_drvdata(pdev);
+	unsigned long time;
 
 	spin_lock_irq(&ftrtc011->lock);
 
@@ -513,8 +516,8 @@ static int ftrtc011_set_time(struct device *dev, struct rtc_time *tm)
 
 static int ftrtc011_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 {
-	struct platform_device	*pdev = to_platform_device(dev);
-	struct ftrtc011		*ftrtc011 = platform_get_drvdata(pdev);
+	struct platform_device *pdev = to_platform_device(dev);
+	struct ftrtc011	*ftrtc011 = platform_get_drvdata(pdev);
 
 	ftrtc011_get_alarm_tm(ftrtc011, &alrm->time);
 	return 0;
@@ -522,8 +525,8 @@ static int ftrtc011_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 
 static int ftrtc011_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 {
-	struct platform_device	*pdev = to_platform_device(dev);
-	struct ftrtc011		*ftrtc011 = platform_get_drvdata(pdev);
+	struct platform_device *pdev = to_platform_device(dev);
+	struct ftrtc011	*ftrtc011 = platform_get_drvdata(pdev);
 
 	ftrtc011_show_tm(ftrtc011, __func__, &alrm->time);
 
@@ -531,15 +534,15 @@ static int ftrtc011_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,22))
 	{
 		struct rtc_time	tm;
-		unsigned long	now, then;
-		int		err;
+		unsigned long now, then;
+		int err;
 
 		ftrtc011_read_time(&ftrtc011->pdev->dev, &tm);
 		rtc_tm_to_time(&tm, &now);
 
-		alrm->time.tm_mday	= tm.tm_mday;
-		alrm->time.tm_mon	= tm.tm_mon;
-		alrm->time.tm_year	= tm.tm_year;
+		alrm->time.tm_mday = tm.tm_mday;
+		alrm->time.tm_mon = tm.tm_mon;
+		alrm->time.tm_year = tm.tm_year;
 
 		err  = rtc_valid_tm(&alrm->time);
 		if (err < 0) {
@@ -552,9 +555,9 @@ static int ftrtc011_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 		/* alarm may need to wrap into tomorrow */
 		if (then < now) {
 			rtc_time_to_tm(now + 24 * 60 * 60, &tm);
-			alrm->time.tm_mday	= tm.tm_mday;
-			alrm->time.tm_mon	= tm.tm_mon;
-			alrm->time.tm_year	= tm.tm_year;
+			alrm->time.tm_mday = tm.tm_mday;
+			alrm->time.tm_mon = tm.tm_mon;
+			alrm->time.tm_year = tm.tm_year;
 		}
 	}
 #endif
@@ -567,8 +570,8 @@ static int ftrtc011_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 
 static int ftrtc011_irq_set_state(struct device *dev, int enabled)
 {
-	struct platform_device	*pdev = to_platform_device(dev);
-	struct ftrtc011		*ftrtc011 = platform_get_drvdata(pdev);
+	struct platform_device *pdev = to_platform_device(dev);
+	struct ftrtc011	*ftrtc011 = platform_get_drvdata(pdev);
 
 	dev_info(dev, "%s(%d)\n", __func__, enabled);
 
@@ -588,14 +591,14 @@ static int ftrtc011_irq_set_state(struct device *dev, int enabled)
 
 static int ftrtc011_irq_set_freq(struct device *dev, int freq)
 {
-	struct platform_device	*pdev = to_platform_device(dev);
-	struct ftrtc011		*ftrtc011 = platform_get_drvdata(pdev);
+	struct platform_device *pdev = to_platform_device(dev);
+	struct ftrtc011	*ftrtc011 = platform_get_drvdata(pdev);
 
 	dev_info(dev, "%s(%d)\n", __func__, freq);
 
 	spin_lock_irq(&ftrtc011->lock);
-	ftrtc011->rtc->irq_freq		= freq;
-	ftrtc011->periodic_count	= freq;
+	ftrtc011->rtc->irq_freq	= freq;
+	ftrtc011->periodic_count = freq;
 	spin_unlock_irq(&ftrtc011->lock);
 
 	return 0;
@@ -618,10 +621,10 @@ static struct rtc_class_ops ftrtc011_ops = {
  *****************************************************************************/
 static int ftrtc011_probe(struct platform_device *pdev)
 {
-	struct ftrtc011		*ftrtc011;
-	struct resource		*res;
-	int			ret;
-	struct rtc_device	*rtc;
+	struct ftrtc011	*ftrtc011;
+	struct resource	*res;
+	int ret;
+	struct rtc_device *rtc;
 
 	dev_info(&pdev->dev, "%s()\n", __func__);
 
@@ -701,7 +704,7 @@ static struct platform_driver ftrtc011_driver = {
  *****************************************************************************/
 static int __init ftrtc011_init(void)
 {
-	int	ret;
+	int ret;
 
 	printk(KERN_DEBUG "%s()\n", __func__);
 
